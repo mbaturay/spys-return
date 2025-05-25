@@ -26,6 +26,12 @@ class MainScene extends Phaser.Scene {
     this.levelBonus = 100;
     this.scoreText = this.add.text(20, 80, 'Score: 0', { font: '24px Arial', fill: '#222'});
 
+    // Distance-based score accumulation
+    this.distanceTraveled = 0;
+    this.movementScoreRate = 1; // Points per threshold
+    this.movementScoreThreshold = 10; // Pixels before points are added
+    this.lastPlayerX = 0; // Will be set properly after player is created/positioned
+
     // Player setup
     this.direction = 'right'; // Target direction to complete the current floor
     this.playerActualDirection = null; // Direction player is currently moving via input
@@ -33,7 +39,7 @@ class MainScene extends Phaser.Scene {
     this.playerSpeed = 200;
     this.playerPaused = true; // Start paused
     this.justCrossed = false;
-    this.setPlayerPosition();
+    this.setPlayerPosition(); // This will also set lastPlayerX initially
 
     // Elevators setup
     this.createElevators();
@@ -91,6 +97,8 @@ class MainScene extends Phaser.Scene {
     } else {
       this.player.x = this.game.config.width - this.player.width / 2;
     }
+    this.lastPlayerX = this.player.x; // Initialize/reset lastPlayerX
+    this.distanceTraveled = 0;      // Reset distance for the new position
   }
 
   createElevators() {
@@ -194,6 +202,7 @@ class MainScene extends Phaser.Scene {
     if (this.playerPaused) return; // Do not move if paused
 
     if (this.moving && this.playerActualDirection) {
+      // const prevX = this.player.x; // Not needed if using this.lastPlayerX correctly
       const moveSign = (this.playerActualDirection === 'right' ? 1 : -1);
       const moveAmount = this.playerSpeed * (delta / 1000) * moveSign;
       this.player.x += moveAmount;
@@ -201,7 +210,20 @@ class MainScene extends Phaser.Scene {
       // Clamp player to screen bounds
       this.player.x = Phaser.Math.Clamp(this.player.x, this.player.width / 2, this.game.config.width - this.player.width / 2);
 
-      // Check for collisions AFTER player has moved
+      // Distance-based scoring
+      if (this.moving) { // Check moving again as it might have just been set by input
+        const deltaX = Math.abs(this.player.x - this.lastPlayerX);
+        this.distanceTraveled += deltaX;
+        
+        while (this.distanceTraveled >= this.movementScoreThreshold) {
+          this.score += this.movementScoreRate;
+          this.updateScoreText(); // Make sure this function exists and updates the UI
+          this.distanceTraveled -= this.movementScoreThreshold;
+        }
+        this.lastPlayerX = this.player.x; // Update lastPlayerX after movement and scoring
+      }
+
+      // Check for collisions AFTER player has moved and score for movement is calculated
       if (this.checkCollision()) {
         return; // Game over was triggered, stop further processing this frame
       }
@@ -320,6 +342,8 @@ class MainScene extends Phaser.Scene {
             onComplete: () => {
               this.moving = false; // Player is in position, wait for new input
               this.playerActualDirection = null;
+              this.lastPlayerX = this.player.x; // Update for distance scoring start
+              this.distanceTraveled = 0;      // Reset distance for the new floor
               this.activateInvulnerability(); // Activate invulnerability
               // Player will wait for arrow key press to start moving on the new level.
             }
@@ -351,6 +375,8 @@ class MainScene extends Phaser.Scene {
       onComplete: () => {
         this.moving = false;
         this.playerActualDirection = null; // Require new input for the new floor
+        this.lastPlayerX = this.player.x; // Update for distance scoring start
+        this.distanceTraveled = 0;      // Reset distance for the new floor
         this.activateInvulnerability(); // Activate invulnerability
         // Wait for user to press arrow key to set direction and start again
       }
@@ -390,7 +416,7 @@ class MainScene extends Phaser.Scene {
     this.direction = 'right'; // Target direction for floor 0
     this.playerActualDirection = null; // Reset actual direction
     
-    this.setPlayerPosition(); // Position player first
+    this.setPlayerPosition(); // Position player first, this also sets lastPlayerX and resets distanceTraveled
 
     this.moving = false; // Wait for input
     this.playerPaused = true; // Start in a paused state, requiring input to move
@@ -403,6 +429,9 @@ class MainScene extends Phaser.Scene {
       this.invulnerabilityTimer = null;
     }
     this.player.setFillStyle(this.originalPlayerColor); // Ensure player color is reset to original
+
+    // distanceTraveled is reset by setPlayerPosition
+    // lastPlayerX is set by setPlayerPosition
 
     this.createElevators();
     this.gameOver = false;
