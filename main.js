@@ -38,6 +38,10 @@ class MainScene extends Phaser.Scene {
     // Elevators setup
     this.createElevators();
 
+    // Debug Mode Setup
+    this.debugMode = false;
+    this.debugGraphics = this.add.graphics(); // Create graphics layer for debug visuals
+
     // Input for pausing/resuming
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.spaceKey.on('down', () => {
@@ -54,6 +58,14 @@ class MainScene extends Phaser.Scene {
     this.rKey.on('down', () => {
       if (this.gameOver) {
         this.resetGame();
+      }
+    });
+
+    this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.dKey.on('down', () => {
+      this.debugMode = !this.debugMode;
+      if (!this.debugMode) {
+        this.debugGraphics.clear(); // Clear graphics when turning off debug mode
       }
     });
 
@@ -130,6 +142,22 @@ class MainScene extends Phaser.Scene {
       elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
     }
 
+    // Debug mode: Draw hitboxes
+    this.debugGraphics.clear(); // Clear previous frame's debug drawings
+    if (this.debugMode) {
+      this.debugGraphics.lineStyle(2, 0x00ff00, 1); // Green lines for hitboxes
+
+      // Player hitbox
+      const playerBounds = this.player.getBounds();
+      this.debugGraphics.strokeRectShape(playerBounds);
+
+      // Elevators hitboxes
+      for (const elevator of this.elevators) {
+        const elevatorBounds = elevator.rect.getBounds();
+        this.debugGraphics.strokeRectShape(elevatorBounds);
+      }
+    }
+
     // Player input sets the actual movement direction
     if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
       this.playerActualDirection = 'left';
@@ -178,11 +206,19 @@ class MainScene extends Phaser.Scene {
     if (!this.moving) return false; // Only check collisions if player is actively moving
 
     const playerBounds = this.player.getBounds();
+    const playerFloorY = this.player.y;
+    const tolerance = 20; // Tolerance for vertical alignment
+
     for (const elevator of this.elevators) {
-      const elevatorBounds = elevator.rect.getBounds();
-      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, elevatorBounds)) {
-        this.triggerGameOver();
-        return true; // Collision detected
+      const elevatorCenterY = elevator.rect.y;
+
+      // Check if the elevator is vertically aligned with the player's current floor
+      if (Math.abs(elevatorCenterY - playerFloorY) <= tolerance) {
+        const elevatorBounds = elevator.rect.getBounds();
+        if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, elevatorBounds)) {
+          this.triggerGameOver();
+          return true; // Collision detected
+        }
       }
     }
     return false; // No collision
