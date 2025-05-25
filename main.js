@@ -110,14 +110,25 @@ class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (this.gameOver) return;
 
+    // Elevators movement (independent, always move)
+    // Moved this block before the playerPaused check so elevators always update
+    for (const elevator of this.elevators) {
+      // Use a sine wave for smooth, independent, continuous up/down motion
+      elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
+    }
+
     // Player input sets the actual movement direction
     if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
       this.playerActualDirection = 'left';
       this.moving = true; // Start moving or change direction
+      if (this.playerPaused) this.playerPaused = false; // Auto-unpause on first move
     } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
       this.playerActualDirection = 'right';
       this.moving = true; // Start moving or change direction
+      if (this.playerPaused) this.playerPaused = false; // Auto-unpause on first move
     }
+
+    if (this.playerPaused) return; // Do not move if paused
 
     if (this.moving && this.playerActualDirection) {
       const moveSign = (this.playerActualDirection === 'right' ? 1 : -1);
@@ -141,33 +152,61 @@ class MainScene extends Phaser.Scene {
       // clamping handles it, and no floor cross occurs.
     }
 
-    // Elevators movement (independent, always move)
-    for (const elevator of this.elevators) {
-      // Use a sine wave for smooth, independent, continuous up/down motion
-      elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
-    }
+    // Elevators movement (independent, always move) <-- This block was moved up
+    // for (const elevator of this.elevators) { ... }
   }
 
   handleFloorCross() {
     this.moving = false;
+    this.playerActualDirection = null; // Stop movement and require new input
     this.input.keyboard.resetKeys(); // Prevent stuck movement
+
     const nextFloor = this.floor + 1;
     if (nextFloor >= this.floorsPerLevel) {
       // Level complete
       this.level++;
-      this.floor = 0;
+      this.floor = 0; // Reset floor for the new level
       this.levelText.setText('Level: ' + this.level);
-      this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
-      this.direction = 'right';
-      this.createElevators();
-      this.animatePlayerToFloor(0, 'right');
+      this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel); // Display as Floor 1
+      this.direction = 'right'; // First floor of a new level always starts 'right'
+      
+      this.createElevators(); // Regenerate elevators for the new level difficulty
+
+      // 1. Animate player up and out of canvas
+      this.tweens.add({
+        targets: this.player,
+        y: -this.player.height / 2, // Move completely off-screen (top)
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => {
+          // Player is now off-screen (top)
+
+          // 2. Position player below screen, ready for slide-in
+          // X position for the start of the first floor (floor 0, target direction 'right')
+          this.player.x = this.player.width / 2; 
+          this.player.y = this.game.config.height + this.player.height / 2; // Start below screen
+
+          // 3. Animate player sliding in from bottom to the first floor's starting position
+          this.tweens.add({
+            targets: this.player,
+            y: 550 - (0 * this.floorHeight), // Target Y for floor 0 (the first floor)
+            duration: 700, 
+            ease: 'Power2',
+            onComplete: () => {
+              this.moving = false; // Player is in position, wait for new input
+              this.playerActualDirection = null;
+              // Player will wait for arrow key press to start moving on the new level.
+            }
+          });
+        }
+      });
     } else {
-      // Animate player up to next floor
+      // Advance to the next floor within the current level
       const newDir = this.direction === 'right' ? 'left' : 'right';
-      this.animatePlayerToFloor(nextFloor, newDir);
+      this.animatePlayerToFloor(nextFloor, newDir); // Animates and then sets this.moving = false
       this.floor = nextFloor;
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
-      this.direction = newDir;
+      this.direction = newDir; // Set target direction for the new floor
     }
   }
 
@@ -182,6 +221,7 @@ class MainScene extends Phaser.Scene {
       ease: 'Power2',
       onComplete: () => {
         this.moving = false;
+        this.playerActualDirection = null; // Require new input for the new floor
         // Wait for user to press arrow key to set direction and start again
       }
     });
