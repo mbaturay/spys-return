@@ -8,8 +8,44 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.text(100, 100, 'Spy’s Return', { font: '32px Arial', fill: '#000' });
+    this.HUD_HEIGHT = 80;
 
+    // --- Start Screen Title ---
+    this.startState = true;
+    this.startTitle = this.add.text(
+      this.game.config.width / 2,
+      this.game.config.height / 2 - 60,
+      "Spy’s Return",
+      { font: '56px Arial', fill: '#222', fontStyle: 'bold' }
+    ).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({
+      targets: this.startTitle,
+      alpha: 1,
+      scale: { from: 0.7, to: 1 },
+      duration: 800,
+      ease: 'Power2',
+    });
+
+    // --- HUD: single line layout ---
+    const pad = 24;
+    let hudY = this.HUD_HEIGHT / 2;
+    this.levelText = this.add.text(pad, hudY, 'Level: 1', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
+    this.floorText = this.add.text(0, hudY, 'Floor: 1 / 6', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
+    this.scoreText = this.add.text(0, hudY, 'Score: 0', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
+    this.highScore = parseInt(localStorage.getItem('spysReturnHighScore')) || 0;
+    this.highScoreText = this.add.text(0, hudY, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222', align: 'right' }).setOrigin(1, 0.5);
+
+    // Position HUD elements in a row
+    let x = pad;
+    this.levelText.x = x;
+    x += this.levelText.width + pad;
+    this.floorText.x = x;
+    x += this.floorText.width + pad;
+    this.scoreText.x = x;
+    // High score right-aligned
+    this.highScoreText.x = this.game.config.width - pad;
+
+    // --- Gameplay Area Offset ---
     // Level/floor setup
     this.level = 1;
     this.floor = 0;
@@ -17,33 +53,26 @@ class MainScene extends Phaser.Scene {
     this.floorHeight = 100;
     this.levelBoost = 20;
     this.floorBoost = 5;
-    this.levelText = this.add.text(20, 20, 'Level: 1', { font: '24px Arial', fill: '#222' });
-    this.floorText = this.add.text(20, 50, 'Floor: 1 / 6', { font: '24px Arial', fill: '#222' });
 
     // Score setup
     this.score = 0;
     this.floorPoints = 50;
     this.levelBonus = 100;
-    this.scoreText = this.add.text(20, 80, 'Score: 0', { font: '24px Arial', fill: '#222'});
-
-    // High Score Setup
-    this.highScore = parseInt(localStorage.getItem('spysReturnHighScore')) || 0;
-    this.highScoreText = this.add.text(this.game.config.width - 20, 20, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222'}).setOrigin(1, 0);
 
     // Distance-based score accumulation
     this.distanceTraveled = 0;
-    this.movementScoreRate = 1; // Points per threshold
-    this.movementScoreThreshold = 10; // Pixels before points are added
-    this.lastPlayerX = 0; // Will be set properly after player is created/positioned
+    this.movementScoreRate = 1;
+    this.movementScoreThreshold = 10;
+    this.lastPlayerX = 0;
 
-    // Player setup
-    this.direction = 'right'; // Target direction to complete the current floor
-    this.playerActualDirection = null; // Direction player is currently moving via input
-    this.player = this.add.rectangle(0 + 30, 550, 60, 30, 0x0077ff);
+    // Player setup (Y offset by HUD_HEIGHT)
+    this.direction = 'right';
+    this.playerActualDirection = null;
+    this.player = this.add.rectangle(0 + 30, this.getFloorY(0), 60, 30, 0x0077ff);
     this.playerSpeed = 200;
-    this.playerPaused = true; // Start paused
+    this.playerPaused = true;
     this.justCrossed = false;
-    this.setPlayerPosition(); // This will also set lastPlayerX initially
+    this.setPlayerPosition();
 
     // Elevators setup
     this.createElevators();
@@ -62,6 +91,20 @@ class MainScene extends Phaser.Scene {
     // Input for pausing/resuming
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.spaceKey.on('down', () => {
+      if (this.startState) {
+        // Hide start title and begin game
+        this.startState = false;
+        this.tweens.add({
+          targets: this.startTitle,
+          alpha: 0,
+          scale: 0.7,
+          duration: 400,
+          ease: 'Power2',
+          onComplete: () => this.startTitle.setVisible(false)
+        });
+        this.playerPaused = false;
+        return;
+      }
       if (this.gameOver) {
         this.resetGame();
       } else if (this.playerPaused) {
@@ -93,16 +136,21 @@ class MainScene extends Phaser.Scene {
     this.gameOverText = null;
   }
 
+  getFloorY(floorIdx) {
+    // Returns the Y position for a given floor, offset by HUD_HEIGHT
+    return this.game.config.height - ((floorIdx + 1) * this.floorHeight) + this.HUD_HEIGHT;
+  }
+
   setPlayerPosition() {
-    // Set player Y based on floor, X based on direction
-    this.player.y = 550 - this.floor * this.floorHeight;
+    // Set player Y based on floor, X based on direction, respecting HUD_HEIGHT
+    this.player.y = this.getFloorY(this.floor);
     if (this.direction === 'right') {
       this.player.x = this.player.width / 2;
     } else {
       this.player.x = this.game.config.width - this.player.width / 2;
     }
-    this.lastPlayerX = this.player.x; // Initialize/reset lastPlayerX
-    this.distanceTraveled = 0;      // Reset distance for the new position
+    this.lastPlayerX = this.player.x;
+    this.distanceTraveled = 0;
   }
 
   createElevators() {
@@ -114,39 +162,30 @@ class MainScene extends Phaser.Scene {
     this.elevators = [];
     const elevatorWidth = 20;
     const elevatorHeight = 60;
-    const numberOfElevators = 6; // Explicitly 6 elevators
+    const numberOfElevators = 6;
 
-    // Define screen-wide movement limits for elevators
-    const screenMinY = elevatorHeight / 2;
+    // Define movement limits for elevators (below HUD bar)
+    const screenMinY = this.HUD_HEIGHT + elevatorHeight / 2;
     const screenMaxY = this.game.config.height - elevatorHeight / 2;
     const amplitude = (screenMaxY - screenMinY) / 2;
     const centerY = (screenMinY + screenMaxY) / 2;
 
-    // Calculate equal spacing for X positions
     const spacingX = this.game.config.width / (numberOfElevators + 1);
 
     for (let i = 0; i < numberOfElevators; i++) {
       const elevatorX = spacingX * (i + 1);
-      
-      // Speed can be influenced by level and an index (i) for variety
       const baseSpeed = Phaser.Math.Between(80, 160);
-      const speed = baseSpeed + (this.level * this.levelBoost) + (i * this.floorBoost); // Use 'i' instead of 'floorIdx' for speed variation
-      const phase = Phaser.Math.FloatBetween(0, Math.PI * 2); // Random phase for async movement
-
-      // Initial Y position can be randomized or set to centerY for simplicity
-      const initialY = centerY; 
+      const speed = baseSpeed + (this.level * this.levelBoost) + (i * this.floorBoost);
+      const phase = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      const initialY = centerY;
       const rect = this.add.rectangle(elevatorX, initialY, elevatorWidth, elevatorHeight, 0xff4444);
-      
       this.elevators.push({
         rect,
         speed,
         phase,
-        centerY,      // Center of screen-wide oscillation
-        amplitude,      // Amplitude for screen-wide oscillation
-        // 'floor' property might not be as relevant if elevators are screen-wide and not tied to floor strips
-        // but we can keep it if it helps other logic, or remove if not needed.
-        // For now, let's use 'i' as an identifier if needed, similar to how floorIdx was used.
-        id: i 
+        centerY,
+        amplitude,
+        id: i
       });
     }
   }
@@ -167,6 +206,7 @@ class MainScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    if (this.startState) return; // Pause everything on start screen
     if (this.gameOver) return;
 
     // Elevators movement (independent, always move)
@@ -305,70 +345,55 @@ class MainScene extends Phaser.Scene {
 
   handleFloorCross() {
     this.moving = false;
-    this.playerActualDirection = null; // Stop movement and require new input
-    this.input.keyboard.resetKeys(); // Prevent stuck movement
-
+    this.playerActualDirection = null;
+    this.input.keyboard.resetKeys();
     const nextFloor = this.floor + 1;
     if (nextFloor >= this.floorsPerLevel) {
-      // Level complete
-      this.score += this.floorPoints; // Points for the last floor
-      this.score += this.levelBonus;  // Bonus for completing the level
+      this.score += this.floorPoints;
+      this.score += this.levelBonus;
       this.updateScoreText();
-
       this.level++;
-      this.floor = 0; // Reset floor for the new level
+      this.floor = 0;
       this.levelText.setText('Level: ' + this.level);
-      this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel); // Display as Floor 1
-      this.direction = 'right'; // First floor of a new level always starts 'right'
-      
-      this.createElevators(); // Regenerate elevators for the new level difficulty
-
-      // 1. Animate player up and out of canvas
+      this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
+      this.direction = 'right';
+      this.createElevators();
       this.tweens.add({
         targets: this.player,
-        y: -this.player.height / 2, // Move completely off-screen (top)
+        y: -this.player.height / 2 + this.HUD_HEIGHT, // Move off-screen, but respect HUD
         duration: 500,
         ease: 'Power2',
         onComplete: () => {
-          // Player is now off-screen (top)
-
-          // 2. Position player below screen, ready for slide-in
-          // X position for the start of the first floor (floor 0, target direction 'right')
-          this.player.x = this.player.width / 2; 
-          this.player.y = this.game.config.height + this.player.height / 2; // Start below screen
-
-          // 3. Animate player sliding in from bottom to the first floor's starting position
+          this.player.x = this.player.width / 2;
+          this.player.y = this.game.config.height + this.player.height / 2;
           this.tweens.add({
             targets: this.player,
-            y: 550 - (0 * this.floorHeight), // Target Y for floor 0 (the first floor)
-            duration: 700, 
+            y: this.getFloorY(0),
+            duration: 700,
             ease: 'Power2',
             onComplete: () => {
-              this.moving = false; // Player is in position, wait for new input
+              this.moving = false;
               this.playerActualDirection = null;
-              this.lastPlayerX = this.player.x; // Update for distance scoring start
-              this.distanceTraveled = 0;      // Reset distance for the new floor
-              this.activateInvulnerability(); // Activate invulnerability
-              // Player will wait for arrow key press to start moving on the new level.
+              this.lastPlayerX = this.player.x;
+              this.distanceTraveled = 0;
+              this.activateInvulnerability();
             }
           });
         }
       });
     } else {
-      // Advance to the next floor within the current level
       this.score += this.floorPoints;
       this.updateScoreText();
-
       const newDir = this.direction === 'right' ? 'left' : 'right';
-      this.animatePlayerToFloor(nextFloor, newDir); // Animates and then sets this.moving = false
+      this.animatePlayerToFloor(nextFloor, newDir);
       this.floor = nextFloor;
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
-      this.direction = newDir; // Set target direction for the new floor
+      this.direction = newDir;
     }
   }
 
   animatePlayerToFloor(floor, direction) {
-    const newY = 550 - floor * this.floorHeight;
+    const newY = this.getFloorY(floor);
     const newX = direction === 'right' ? this.player.width / 2 : this.game.config.width - this.player.width / 2;
     this.tweens.add({
       targets: this.player,
@@ -378,11 +403,10 @@ class MainScene extends Phaser.Scene {
       ease: 'Power2',
       onComplete: () => {
         this.moving = false;
-        this.playerActualDirection = null; // Require new input for the new floor
-        this.lastPlayerX = this.player.x; // Update for distance scoring start
-        this.distanceTraveled = 0;      // Reset distance for the new floor
-        this.activateInvulnerability(); // Activate invulnerability
-        // Wait for user to press arrow key to set direction and start again
+        this.playerActualDirection = null;
+        this.lastPlayerX = this.player.x;
+        this.distanceTraveled = 0;
+        this.activateInvulnerability();
       }
     });
   }
