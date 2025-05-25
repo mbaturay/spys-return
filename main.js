@@ -254,15 +254,27 @@ class MainScene extends Phaser.Scene {
     this.playerActualDirection = null;
     this.playerPaused = true; // Stop player input from causing movement
 
+    // Screen Shake
+    this.cameras.main.shake(300, 0.015); // Duration 300ms, Intensity 0.015
+
+    // Flash red (concurrently or slightly after shake starts)
+    this.cameras.main.flash(300, 255, 0, 0); 
+
+    // Delay Game Over text appearance
     if (this.gameOverText) this.gameOverText.destroy();
+    // Ensure text is initially invisible or not created until delay
     this.gameOverText = this.add.text(
       this.game.config.width / 2,
       this.game.config.height / 2,
       'Game Over!\nPress SPACE or R to Restart',
       { font: '36px Arial', fill: '#ff0000', align: 'center' }
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setVisible(false).setDepth(1); // Start invisible, ensure on top
 
-    this.cameras.main.flash(300, 255, 0, 0); // Flash red for 300ms
+    this.time.delayedCall(300, () => { // Delay matches shake/flash duration
+      if (this.gameOverText) { // Check if it wasn't destroyed by a quick reset
+        this.gameOverText.setVisible(true);
+      }
+    }, [], this);
   }
 
   handleFloorCross() {
