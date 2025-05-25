@@ -42,6 +42,13 @@ class MainScene extends Phaser.Scene {
     this.debugMode = false;
     this.debugGraphics = this.add.graphics(); // Create graphics layer for debug visuals
 
+    // Invulnerability Setup
+    this.invulnerable = false;
+    this.invulnerabilityDuration = 300; // milliseconds
+    this.invulnerabilityTimer = null;
+    this.originalPlayerColor = 0x0077ff; // Matches player creation color
+    this.invulnerablePlayerColor = 0xffff00; // Yellow for invulnerability tint
+
     // Input for pausing/resuming
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.spaceKey.on('down', () => {
@@ -132,6 +139,21 @@ class MainScene extends Phaser.Scene {
     }
   }
 
+  activateInvulnerability() {
+    this.invulnerable = true;
+    this.player.setFillStyle(this.invulnerablePlayerColor);
+
+    if (this.invulnerabilityTimer) {
+      this.invulnerabilityTimer.remove(false); // Remove existing timer if any, false to prevent its onComplete
+    }
+
+    this.invulnerabilityTimer = this.time.delayedCall(this.invulnerabilityDuration, () => {
+      this.invulnerable = false;
+      this.player.setFillStyle(this.originalPlayerColor);
+      this.invulnerabilityTimer = null; // Clear the timer reference
+    }, [], this);
+  }
+
   update(time, delta) {
     if (this.gameOver) return;
 
@@ -203,7 +225,7 @@ class MainScene extends Phaser.Scene {
   }
 
   checkCollision() {
-    if (!this.moving) return false; // Only check collisions if player is actively moving
+    if (!this.moving || this.invulnerable) return false; // Only check collisions if player is actively moving AND not invulnerable
 
     const playerBounds = this.player.getBounds();
     const playerFloorY = this.player.y;
@@ -286,6 +308,7 @@ class MainScene extends Phaser.Scene {
             onComplete: () => {
               this.moving = false; // Player is in position, wait for new input
               this.playerActualDirection = null;
+              this.activateInvulnerability(); // Activate invulnerability
               // Player will wait for arrow key press to start moving on the new level.
             }
           });
@@ -316,6 +339,7 @@ class MainScene extends Phaser.Scene {
       onComplete: () => {
         this.moving = false;
         this.playerActualDirection = null; // Require new input for the new floor
+        this.activateInvulnerability(); // Activate invulnerability
         // Wait for user to press arrow key to set direction and start again
       }
     });
@@ -353,13 +377,26 @@ class MainScene extends Phaser.Scene {
     this.scoreText.setText('Score: 0'); // Reset score display
     this.direction = 'right'; // Target direction for floor 0
     this.playerActualDirection = null; // Reset actual direction
-    this.setPlayerPosition();
+    
+    this.setPlayerPosition(); // Position player first
+
     this.moving = false; // Wait for input
     this.playerPaused = true; // Start in a paused state, requiring input to move
-    this.justCrossed = false;
+    this.justCrossed = false; // This seems to be unused
+
+    // Reset invulnerability state specifically before activating it for the new game/reset
+    this.invulnerable = false;
+    if (this.invulnerabilityTimer) {
+      this.invulnerabilityTimer.remove(false);
+      this.invulnerabilityTimer = null;
+    }
+    this.player.setFillStyle(this.originalPlayerColor); // Ensure player color is reset to original
+
     this.createElevators();
     this.gameOver = false;
     // this.cameras.main.resetFX(); // Not strictly necessary as flash auto-resets
+
+    this.activateInvulnerability(); // Activate for the start of the game
   }
 }
 
