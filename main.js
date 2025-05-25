@@ -44,6 +44,13 @@ class MainScene extends Phaser.Scene {
       }
     });
 
+    this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.rKey.on('down', () => {
+      if (this.gameOver) {
+        this.resetGame();
+      }
+    });
+
     this.cursors = this.input.keyboard.createCursorKeys();
     this.moving = false; // Player starts stationary, waits for first input on a floor
 
@@ -138,6 +145,11 @@ class MainScene extends Phaser.Scene {
       // Clamp player to screen bounds
       this.player.x = Phaser.Math.Clamp(this.player.x, this.player.width / 2, this.game.config.width - this.player.width / 2);
 
+      // Check for collisions AFTER player has moved
+      if (this.checkCollision()) {
+        return; // Game over was triggered, stop further processing this frame
+      }
+
       const atLeftEdge = this.player.x <= this.player.width / 2;
       const atRightEdge = this.player.x >= this.game.config.width - this.player.width / 2;
 
@@ -154,6 +166,39 @@ class MainScene extends Phaser.Scene {
 
     // Elevators movement (independent, always move) <-- This block was moved up
     // for (const elevator of this.elevators) { ... }
+  }
+
+  checkCollision() {
+    if (!this.moving) return false; // Only check collisions if player is actively moving
+
+    const playerBounds = this.player.getBounds();
+    for (const elevator of this.elevators) {
+      const elevatorBounds = elevator.rect.getBounds();
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, elevatorBounds)) {
+        this.triggerGameOver();
+        return true; // Collision detected
+      }
+    }
+    return false; // No collision
+  }
+
+  triggerGameOver() {
+    if (this.gameOver) return; // Already game over
+
+    this.gameOver = true;
+    this.moving = false;
+    this.playerActualDirection = null;
+    this.playerPaused = true; // Stop player input from causing movement
+
+    if (this.gameOverText) this.gameOverText.destroy();
+    this.gameOverText = this.add.text(
+      this.game.config.width / 2,
+      this.game.config.height / 2,
+      'Game Over!\nPress SPACE or R to Restart',
+      { font: '36px Arial', fill: '#ff0000', align: 'center' }
+    ).setOrigin(0.5);
+
+    this.cameras.main.flash(300, 255, 0, 0); // Flash red for 300ms
   }
 
   handleFloorCross() {
@@ -229,6 +274,7 @@ class MainScene extends Phaser.Scene {
 
   resetGame() {
     if (this.gameOverText) this.gameOverText.destroy();
+    this.gameOverText = null; // Ensure it's null so it can be recreated
     this.level = 1;
     this.floor = 0;
     this.levelText.setText('Level: 1');
@@ -237,9 +283,11 @@ class MainScene extends Phaser.Scene {
     this.playerActualDirection = null; // Reset actual direction
     this.setPlayerPosition();
     this.moving = false; // Wait for input
+    this.playerPaused = true; // Start in a paused state, requiring input to move
     this.justCrossed = false;
     this.createElevators();
     this.gameOver = false;
+    // this.cameras.main.resetFX(); // Not strictly necessary as flash auto-resets
   }
 }
 
