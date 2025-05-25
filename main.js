@@ -113,11 +113,9 @@ class MainScene extends Phaser.Scene {
       }
       if (this.gameOver) {
         this.resetGame();
-      } else if (this.playerPaused) {
-        this.playerPaused = false;
-      } else {
-        this.playerPaused = true;
       }
+      // Removed: else if (this.playerPaused) ...
+      // Removed: else { this.playerPaused = true; }
     });
 
     this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
@@ -137,6 +135,7 @@ class MainScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.moving = false; // Player starts stationary, waits for first input on a floor
+    // Remove: this.playerPaused = true; // Start paused
 
     this.gameOver = false;
     this.gameOverText = null;
