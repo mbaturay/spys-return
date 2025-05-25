@@ -15,7 +15,7 @@ class MainScene extends Phaser.Scene {
     this.startTitle = this.add.text(
       this.game.config.width / 2,
       this.game.config.height / 2 - 60,
-      "Spy’s Return",
+      "Return to Mars",
       { font: '56px Arial', fill: '#222', fontStyle: 'bold' }
     ).setOrigin(0.5).setAlpha(0);
     this.tweens.add({
@@ -26,24 +26,30 @@ class MainScene extends Phaser.Scene {
       ease: 'Power2',
     });
 
-    // --- HUD: single line layout ---
+    // --- HUD: new layout ---
     const pad = 24;
     let hudY = this.HUD_HEIGHT / 2;
-    this.levelText = this.add.text(pad, hudY, 'Level: 1', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
-    this.floorText = this.add.text(0, hudY, 'Floor: 1 / 6', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
-    this.scoreText = this.add.text(0, hudY, 'Score: 0', { font: '24px Arial', fill: '#222', align: 'left' }).setOrigin(0, 0.5);
+    // Level and Floor: left-aligned, same line
+    const smallFont = { font: '18px Arial', fill: '#222', align: 'left' };
+    this.levelText = this.add.text(pad, hudY, 'Level: 1', smallFont).setOrigin(0, 0.5);
+    this.floorText = this.add.text(0, hudY, 'Floor: 1 / 6', smallFont).setOrigin(0, 0.5);
+    // Score: center
+    this.scoreText = this.add.text(this.game.config.width / 2, hudY, 'Score: 0', { font: '24px Arial', fill: '#222', align: 'center' }).setOrigin(0.5, 0.5);
+    // High score: right-aligned
     this.highScore = parseInt(localStorage.getItem('spysReturnHighScore')) || 0;
-    this.highScoreText = this.add.text(0, hudY, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222', align: 'right' }).setOrigin(1, 0.5);
+    this.highScoreText = this.add.text(this.game.config.width - pad, hudY, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222', align: 'right' }).setOrigin(1, 0.5);
 
-    // Position HUD elements in a row
-    let x = pad;
-    this.levelText.x = x;
-    x += this.levelText.width + pad;
-    this.floorText.x = x;
-    x += this.floorText.width + pad;
-    this.scoreText.x = x;
-    // High score right-aligned
+    // Position Level and Floor next to each other, left side
+    this.levelText.x = pad;
+    this.floorText.x = pad + this.levelText.width + pad / 2;
+    this.levelText.y = hudY;
+    this.floorText.y = hudY;
+    // Score stays centered
+    this.scoreText.x = this.game.config.width / 2;
+    this.scoreText.y = hudY;
+    // High score stays at right
     this.highScoreText.x = this.game.config.width - pad;
+    this.highScoreText.y = hudY;
 
     // --- Gameplay Area Offset ---
     // Level/floor setup
@@ -134,6 +140,15 @@ class MainScene extends Phaser.Scene {
 
     this.gameOver = false;
     this.gameOverText = null;
+
+    this.highScoreText.setInteractive({ useHandCursor: true });
+    this.highScoreText.on('pointerdown', (pointer) => {
+      if (pointer && pointer.event && pointer.event.detail === 2) { // double click
+        this.highScore = 0;
+        localStorage.setItem('spysReturnHighScore', '0');
+        this.highScoreText.setText('High Score: 0');
+      }
+    });
   }
 
   getFloorY(floorIdx) {
