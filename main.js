@@ -1,4 +1,7 @@
-class MainScene extends Phaser.Scene {
+class Mai  create() {
+    this.add.text(100, 100, 'Journey to Mars', { font: '32px Arial', fill: '#000' });
+
+    // Level/floor setupne extends Phaser.Scene {
   constructor() {
     super('MainScene');
   }
@@ -27,7 +30,7 @@ class MainScene extends Phaser.Scene {
     this.scoreText = this.add.text(20, 80, 'Score: 0', { font: '24px Arial', fill: '#222'});
 
     // High Score Setup
-    this.highScore = parseInt(localStorage.getItem('spysReturnHighScore')) || 0;
+    this.highScore = parseInt(localStorage.getItem('journeyToMarsHighScore')) || 0;
     this.highScoreText = this.add.text(this.game.config.width - 20, 20, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222'}).setOrigin(1, 0);
 
     // Distance-based score accumulation
@@ -409,7 +412,7 @@ class MainScene extends Phaser.Scene {
 
     if (this.score > this.highScore) {
       this.highScore = this.score;
-      localStorage.setItem('spysReturnHighScore', this.highScore);
+      localStorage.setItem('journeyToMarsHighScore', this.highScore);
       this.highScoreText.setText('High Score: ' + this.highScore);
       // Optional: Flash high score text or show "NEW HIGH SCORE!" nearby
       this.tweens.add({
