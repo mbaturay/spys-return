@@ -26,6 +26,10 @@ class MainScene extends Phaser.Scene {
     this.levelBonus = 100;
     this.scoreText = this.add.text(20, 80, 'Score: 0', { font: '24px Arial', fill: '#222'});
 
+    // High Score Setup
+    this.highScore = parseInt(localStorage.getItem('spysReturnHighScore')) || 0;
+    this.highScoreText = this.add.text(this.game.config.width - 20, 20, 'High Score: ' + this.highScore, { font: '24px Arial', fill: '#222'}).setOrigin(1, 0);
+
     // Distance-based score accumulation
     this.distanceTraveled = 0;
     this.movementScoreRate = 1; // Points per threshold
@@ -402,6 +406,21 @@ class MainScene extends Phaser.Scene {
         // this.scoreText.setFill('#222'); 
       }
     });
+
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      localStorage.setItem('spysReturnHighScore', this.highScore);
+      this.highScoreText.setText('High Score: ' + this.highScore);
+      // Optional: Flash high score text or show "NEW HIGH SCORE!" nearby
+      this.tweens.add({
+        targets: this.highScoreText,
+        alpha: { from: 0.5, to: 1 },
+        duration: 150,
+        ease: 'Power1',
+        yoyo: true,
+        repeat: 2 // Flash a few times
+      });
+    }
   }
 
   resetGame() {
@@ -413,6 +432,7 @@ class MainScene extends Phaser.Scene {
     this.levelText.setText('Level: 1');
     this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
     this.scoreText.setText('Score: 0'); // Reset score display
+    this.highScoreText.setText('High Score: ' + this.highScore); // Ensure high score text is accurate
     this.direction = 'right'; // Target direction for floor 0
     this.playerActualDirection = null; // Reset actual direction
     
