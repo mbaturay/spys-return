@@ -20,6 +20,12 @@ class MainScene extends Phaser.Scene {
     this.levelText = this.add.text(20, 20, 'Level: 1', { font: '24px Arial', fill: '#222' });
     this.floorText = this.add.text(20, 50, 'Floor: 1 / 6', { font: '24px Arial', fill: '#222' });
 
+    // Score setup
+    this.score = 0;
+    this.floorPoints = 50;
+    this.levelBonus = 100;
+    this.scoreText = this.add.text(20, 80, 'Score: 0', { font: '24px Arial', fill: '#222'});
+
     // Player setup
     this.direction = 'right'; // Target direction to complete the current floor
     this.playerActualDirection = null; // Direction player is currently moving via input
@@ -209,6 +215,10 @@ class MainScene extends Phaser.Scene {
     const nextFloor = this.floor + 1;
     if (nextFloor >= this.floorsPerLevel) {
       // Level complete
+      this.score += this.floorPoints; // Points for the last floor
+      this.score += this.levelBonus;  // Bonus for completing the level
+      this.updateScoreText();
+
       this.level++;
       this.floor = 0; // Reset floor for the new level
       this.levelText.setText('Level: ' + this.level);
@@ -247,6 +257,9 @@ class MainScene extends Phaser.Scene {
       });
     } else {
       // Advance to the next floor within the current level
+      this.score += this.floorPoints;
+      this.updateScoreText();
+
       const newDir = this.direction === 'right' ? 'left' : 'right';
       this.animatePlayerToFloor(nextFloor, newDir); // Animates and then sets this.moving = false
       this.floor = nextFloor;
@@ -272,13 +285,36 @@ class MainScene extends Phaser.Scene {
     });
   }
 
+  updateScoreText() {
+    this.scoreText.setText('Score: ' + this.score);
+    // Optional: Add a subtle pop animation to the score text
+    this.tweens.add({
+      targets: this.scoreText,
+      scaleX: 1.15, // Slightly larger pop
+      scaleY: 1.15,
+      duration: 100, // Quick animation
+      ease: 'Power1',
+      yoyo: true, // Automatically returns to original scale
+      onStart: () => {
+        // Optional: Change color during pop
+        // this.scoreText.setFill('#00ff00'); 
+      },
+      onComplete: () => {
+        // Optional: Revert color if changed
+        // this.scoreText.setFill('#222'); 
+      }
+    });
+  }
+
   resetGame() {
     if (this.gameOverText) this.gameOverText.destroy();
     this.gameOverText = null; // Ensure it's null so it can be recreated
     this.level = 1;
     this.floor = 0;
+    this.score = 0; // Reset score
     this.levelText.setText('Level: 1');
     this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
+    this.scoreText.setText('Score: 0'); // Reset score display
     this.direction = 'right'; // Target direction for floor 0
     this.playerActualDirection = null; // Reset actual direction
     this.setPlayerPosition();
