@@ -159,6 +159,8 @@ class MainScene extends Phaser.Scene {
     });
     this.createCollisionIndicator();
     this.updateCollisionIndicator();
+
+    this.transitioning = false; // Block input during level/floor transitions
   }
 
   getFloorY(floorIdx) {
@@ -234,12 +236,12 @@ class MainScene extends Phaser.Scene {
     if (this.startState) return; // Pause everything on start screen
     if (this.gameOver) return;
 
-    // Elevators movement (independent, always move)
-    // Moved this block before the playerPaused check so elevators always update
+    // Elevators movement (independent, always move except on start/game over)
     for (const elevator of this.elevators) {
-      // Use a sine wave for smooth, independent, continuous up/down motion
       elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
     }
+
+    if (this.transitioning) return; // Block input and movement during transitions
 
     // Debug mode: Draw hitboxes
     this.debugGraphics.clear(); // Clear previous frame's debug drawings
@@ -417,6 +419,7 @@ class MainScene extends Phaser.Scene {
       this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
       this.direction = 'right';
       this.createElevators();
+      this.transitioning = true; // Block input during transition
       this.tweens.add({
         targets: this.player,
         y: -this.player.height / 2 + this.HUD_HEIGHT, // Move off-screen, but respect HUD
@@ -436,6 +439,10 @@ class MainScene extends Phaser.Scene {
               this.lastPlayerX = this.player.x;
               this.distanceTraveled = 0;
               this.activateInvulnerability();
+              this.initialDirection = null;
+              this.brokeBonusStreak = false;
+              this.input.keyboard.resetKeys();
+              this.transitioning = false; // Allow input after transition
             }
           });
         }
@@ -444,7 +451,10 @@ class MainScene extends Phaser.Scene {
       this.score += this.floorPoints;
       this.updateScoreText();
       const newDir = this.direction === 'right' ? 'left' : 'right';
-      this.animatePlayerToFloor(nextFloor, newDir);
+      this.transitioning = true; // Block input during transition
+      this.animatePlayerToFloor(nextFloor, newDir, () => {
+        this.transitioning = false; // Allow input after transition
+      });
       this.floor = nextFloor;
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
       this.direction = newDir;
@@ -454,7 +464,7 @@ class MainScene extends Phaser.Scene {
     this.brokeBonusStreak = false;
   }
 
-  animatePlayerToFloor(floor, direction) {
+  animatePlayerToFloor(floor, direction, onCompleteCb) {
     const newY = this.getFloorY(floor);
     const newX = direction === 'right' ? this.player.width / 2 : this.game.config.width - this.player.width / 2;
     this.tweens.add({
@@ -469,9 +479,9 @@ class MainScene extends Phaser.Scene {
         this.lastPlayerX = this.player.x;
         this.distanceTraveled = 0;
         this.activateInvulnerability();
-        // Reset bonus mechanic for new floor
         this.initialDirection = null;
         this.brokeBonusStreak = false;
+        if (onCompleteCb) onCompleteCb();
       }
     });
   }
@@ -549,6 +559,7 @@ class MainScene extends Phaser.Scene {
     this.activateInvulnerability(); // Activate for the start of the game
     this.createCollisionIndicator();
     this.updateCollisionIndicator();
+    this.playerPaused = false; // Allow movement after reset
   }
 
   createCollisionIndicator() {
