@@ -293,7 +293,7 @@ class MainScene extends Phaser.Scene {
       const hookTopY = elevator.sprite.y - 26; // Adjusted from -12 to -8 for better visual alignment
       // Use the elevator's color for the tether
       const color = elevator.color || 0x999999; // Use stored color or default
-      this.tetherGraphics.lineStyle(2, color, 1);
+      this.tetherGraphics.lineStyle(1, color, 1);
       // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, hookTopY)
       this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, hookTopY));
     }
