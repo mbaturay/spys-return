@@ -5,6 +5,8 @@ class MainScene extends Phaser.Scene {
 
   preload() {
     // Load assets (placeholder for now)
+    this.load.image('hook', 'assets/hook.svg'); // Added hook asset
+    this.load.image('fish', 'assets/fish.svg'); // Added fish asset
   }
 
   create() {
@@ -75,7 +77,10 @@ class MainScene extends Phaser.Scene {
     // Player setup (Y offset by HUD_HEIGHT)
     this.direction = 'right';
     this.playerActualDirection = null;
-    this.player = this.add.rectangle(0 + 30, this.getFloorY(0), 60, 30, 0x0077ff);
+    // this.player = this.add.rectangle(0 + 30, this.getFloorY(0), 60, 30, 0x0077ff); // Old rectangle
+    this.player = this.add.sprite(0 + 30, this.getFloorY(0), 'fish');
+    this.player.setDisplaySize(60, 30);
+    this.player.setOrigin(0.5, 0.5); // Center origin
     this.playerSpeed = 200;
     this.playerPaused = true;
     this.justCrossed = false;
@@ -83,6 +88,14 @@ class MainScene extends Phaser.Scene {
 
     // Elevators setup
     this.createElevators();
+
+    // Optional: Apply smoothing off if needed
+    if (this.textures.exists('hook')) {
+      this.textures.get('hook').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+    if (this.textures.exists('fish')) {
+      this.textures.get('fish').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
 
     // Debug Mode Setup
     this.debugMode = false;
@@ -92,7 +105,7 @@ class MainScene extends Phaser.Scene {
     this.invulnerable = false;
     this.invulnerabilityDuration = 300; // milliseconds
     this.invulnerabilityTimer = null;
-    this.originalPlayerColor = 0x0077ff; // Matches player creation color
+    this.originalPlayerColor = 0xffffff; // White (no tint) for sprite
     this.invulnerablePlayerColor = 0xffff00; // Yellow for invulnerability tint
 
     // Input for pausing/resuming
@@ -175,9 +188,9 @@ class MainScene extends Phaser.Scene {
     // Set player Y based on floor, X based on direction, respecting HUD_HEIGHT
     this.player.y = this.getFloorY(this.floor);
     if (this.direction === 'right') {
-      this.player.x = this.player.width / 2;
+      this.player.x = this.player.displayWidth / 2; // Use displayWidth for sprite
     } else {
-      this.player.x = this.game.config.width - this.player.width / 2;
+      this.player.x = this.game.config.width - this.player.displayWidth / 2; // Use displayWidth for sprite
     }
     this.lastPlayerX = this.player.x;
     this.distanceTraveled = 0;
@@ -190,13 +203,16 @@ class MainScene extends Phaser.Scene {
     }
     if (this.elevators) {
       for (const elevator of this.elevators) {
-        elevator.rect.destroy();
+        if (elevator.sprite) { // Changed from elevator.rect
+          elevator.sprite.destroy();
+        }
       }
     }
     this.elevators = [];
     const elevatorWidth = 20;
     const elevatorHeight = 60;
     const numberOfElevators = 6;
+    const elevatorColor = 0xff4444; // Default color for hooks and tethers
 
     // Define movement limits for elevators (below HUD bar)
     const screenMinY = this.HUD_HEIGHT + elevatorHeight / 2;
@@ -212,21 +228,28 @@ class MainScene extends Phaser.Scene {
       const speed = baseSpeed + (this.level * this.levelBoost) + (i * this.floorBoost);
       const phase = Phaser.Math.FloatBetween(0, Math.PI * 2);
       const initialY = centerY;
-      const rect = this.add.rectangle(elevatorX, initialY, elevatorWidth, elevatorHeight, 0xff4444);
+      // const rect = this.add.rectangle(elevatorX, initialY, elevatorWidth, elevatorHeight, 0xff4444); // Old rectangle
+      const sprite = this.add.sprite(elevatorX, initialY, 'hook');
+      sprite.setDisplaySize(elevatorWidth, elevatorHeight);
+      sprite.setOrigin(0.5, 0.5); // Center origin
+      sprite.setTint(elevatorColor); // Tint the hook
+
       this.elevators.push({
-        rect,
+        sprite, // Changed from rect
         speed,
         phase,
         centerY,
         amplitude,
-        id: i
+        id: i,
+        color: elevatorColor // Store color for tether
       });
     }
   }
 
   activateInvulnerability() {
     this.invulnerable = true;
-    this.player.setFillStyle(this.invulnerablePlayerColor);
+    // this.player.setFillStyle(this.invulnerablePlayerColor); // Old for rectangle
+    this.player.setTint(this.invulnerablePlayerColor); // New for sprite
 
     if (this.invulnerabilityTimer) {
       this.invulnerabilityTimer.remove(false); // Remove existing timer if any, false to prevent its onComplete
@@ -234,7 +257,8 @@ class MainScene extends Phaser.Scene {
 
     this.invulnerabilityTimer = this.time.delayedCall(this.invulnerabilityDuration, () => {
       this.invulnerable = false;
-      this.player.setFillStyle(this.originalPlayerColor);
+      // this.player.setFillStyle(this.originalPlayerColor); // Old for rectangle
+      this.player.setTint(this.originalPlayerColor); // New for sprite (clear tint)
       this.invulnerabilityTimer = null; // Clear the timer reference
     }, [], this);
   }
@@ -245,7 +269,8 @@ class MainScene extends Phaser.Scene {
 
     // Elevators movement (independent, always move except on start/game over)
     for (const elevator of this.elevators) {
-      elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
+      // elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase); // Old
+      elevator.sprite.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase); // New
     }
 
     // Elevator tethers: draw lines from bottom of HUD to each elevator
@@ -253,11 +278,11 @@ class MainScene extends Phaser.Scene {
     this.tetherGraphics.clear();
     for (const elevator of this.elevators) {
       // Get the X center of the elevator
-      const x = elevator.rect.x;
+      const x = elevator.sprite.x; // Changed from elevator.rect.x
       // Get the top Y of the elevator
-      const y = elevator.rect.y - elevator.rect.height / 2;
-      // Use the elevator\'s color for the tether
-      const color = elevator.rect.fillColor || 0x999999;
+      const y = elevator.sprite.y - elevator.sprite.displayHeight / 2; // Changed for sprite
+      // Use the elevator's color for the tether
+      const color = elevator.color || 0x999999; // Use stored color or default
       this.tetherGraphics.lineStyle(2, color, 1);
       // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, y) to ensure perfect connection
       this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, y));
@@ -276,7 +301,8 @@ class MainScene extends Phaser.Scene {
 
       // Elevators hitboxes
       for (const elevator of this.elevators) {
-        const elevatorBounds = elevator.rect.getBounds();
+        // const elevatorBounds = elevator.rect.getBounds(); // Old
+        const elevatorBounds = elevator.sprite.getBounds(); // New
         this.debugGraphics.strokeRectShape(elevatorBounds);
       }
     }
@@ -311,7 +337,7 @@ class MainScene extends Phaser.Scene {
       this.player.x += moveAmount;
 
       // Clamp player to screen bounds
-      this.player.x = Phaser.Math.Clamp(this.player.x, this.player.width / 2, this.game.config.width - this.player.width / 2);
+      this.player.x = Phaser.Math.Clamp(this.player.x, this.player.displayWidth / 2, this.game.config.width - this.player.displayWidth / 2); // Use displayWidth
 
       // Distance-based scoring
       if (this.moving) { // Check moving again as it might have just been set by input
@@ -331,8 +357,8 @@ class MainScene extends Phaser.Scene {
         return; // Game over was triggered, stop further processing this frame
       }
 
-      const atLeftEdge = this.player.x <= this.player.width / 2;
-      const atRightEdge = this.player.x >= this.game.config.width - this.player.width / 2;
+      const atLeftEdge = this.player.x <= this.player.displayWidth / 2; // Use displayWidth
+      const atRightEdge = this.player.x >= this.game.config.width - this.player.displayWidth / 2; // Use displayWidth
 
       // Progression check: only advance if moving in the TARGET direction and hit the TARGET edge
       if (this.playerActualDirection === this.direction) { // Is player moving towards the floor's goal?
@@ -368,11 +394,12 @@ class MainScene extends Phaser.Scene {
     const tolerance = 20; // Tolerance for vertical alignment
 
     for (const elevator of this.elevators) {
-      const elevatorCenterY = elevator.rect.y;
+      const elevatorCenterY = elevator.sprite.y; // Changed from elevator.rect.y
 
       // Check if the elevator is vertically aligned with the player's current floor
       if (Math.abs(elevatorCenterY - playerFloorY) <= tolerance) {
-        const elevatorBounds = elevator.rect.getBounds();
+        // const elevatorBounds = elevator.rect.getBounds(); // Old
+        const elevatorBounds = elevator.sprite.getBounds(); // New
         if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, elevatorBounds)) {
           this.triggerGameOver();
           return true; // Collision detected
@@ -455,12 +482,12 @@ class MainScene extends Phaser.Scene {
       this.transitioning = true; // Block input during transition
       this.tweens.add({
         targets: this.player,
-        y: -this.player.height / 2 + this.HUD_HEIGHT, // Move off-screen, but respect HUD
+        y: -this.player.displayHeight / 2 + this.HUD_HEIGHT, // Move off-screen, but respect HUD, use displayHeight
         duration: 500,
         ease: 'Power2',
         onComplete: () => {
-          this.player.x = this.player.width / 2;
-          this.player.y = this.game.config.height + this.player.height / 2;
+          this.player.x = this.player.displayWidth / 2; // Use displayWidth
+          this.player.y = this.game.config.height + this.player.displayHeight / 2; // Use displayHeight
           this.tweens.add({
             targets: this.player,
             y: this.getFloorY(0),
@@ -499,7 +526,7 @@ class MainScene extends Phaser.Scene {
 
   animatePlayerToFloor(floor, direction, onCompleteCb) {
     const newY = this.getFloorY(floor);
-    const newX = direction === 'right' ? this.player.width / 2 : this.game.config.width - this.player.width / 2;
+    const newX = direction === 'right' ? this.player.displayWidth / 2 : this.game.config.width - this.player.displayWidth / 2; // Use displayWidth
     this.tweens.add({
       targets: this.player,
       y: newY,
@@ -580,7 +607,8 @@ class MainScene extends Phaser.Scene {
       this.invulnerabilityTimer.remove(false);
       this.invulnerabilityTimer = null;
     }
-    this.player.setFillStyle(this.originalPlayerColor); // Ensure player color is reset to original
+    // this.player.setFillStyle(this.originalPlayerColor); // Ensure player color is reset to original // Old
+    this.player.setTint(this.originalPlayerColor); // Ensure player tint is reset to original // New
 
     // distanceTraveled is reset by setPlayerPosition
     // lastPlayerX is set by setPlayerPosition
