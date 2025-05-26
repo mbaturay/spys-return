@@ -214,7 +214,7 @@ class MainScene extends Phaser.Scene {
     const elevatorWidth = 20;
     const elevatorHeight = 60;
     const numberOfElevators = 6;
-    const elevatorColor = 0xff4444; // Default color for hooks and tethers
+    const elevatorColor = 0x000000; // Default color for hooks and tethers (black)
 
     // Define movement limits for elevators (below HUD bar)
     const screenMinY = this.HUD_HEIGHT + elevatorHeight / 2;
@@ -284,14 +284,18 @@ class MainScene extends Phaser.Scene {
     this.tetherGraphics.clear();
     for (const elevator of this.elevators) {
       // Get the X center of the elevator
-      const x = elevator.sprite.x; // Changed from elevator.rect.x
-      // Get the top Y of the elevator
-      const y = elevator.sprite.y - elevator.sprite.displayHeight / 2; // Changed for sprite
+      //const x = elevator.sprite.flipX ? elevator.sprite.x - 5 : elevator.sprite.x + 5;
+      const x = elevator.sprite.x;
+      // Calculate the visual top of the hook for tether connection
+      // elevator.sprite.y is the center, displayHeight is 60. displayHeight / 2 is 30.
+      // An offset of 8 from the center means 30 - 8 = 22 pixels from the top edge.
+      // Or, if thinking from sprite.y (center), -8 means 8 pixels above the center.
+      const hookTopY = elevator.sprite.y - 26; // Adjusted from -12 to -8 for better visual alignment
       // Use the elevator's color for the tether
       const color = elevator.color || 0x999999; // Use stored color or default
       this.tetherGraphics.lineStyle(2, color, 1);
-      // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, y) to ensure perfect connection
-      this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, y));
+      // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, hookTopY)
+      this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, hookTopY));
     }
 
     if (this.transitioning) return; // Block player input and movement logic during transitions
