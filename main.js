@@ -248,13 +248,23 @@ class MainScene extends Phaser.Scene {
 
     // Player input sets the actual movement direction
     if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      if (!this.moving) {
+        this.initialDirection = 'left';
+        this.brokeBonusStreak = false;
+      } else if (this.initialDirection !== 'left') {
+        this.brokeBonusStreak = true;
+      }
       this.playerActualDirection = 'left';
-      this.moving = true; // Start moving or change direction
-      if (this.playerPaused) this.playerPaused = false; // Auto-unpause on first move
+      this.moving = true;
     } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      if (!this.moving) {
+        this.initialDirection = 'right';
+        this.brokeBonusStreak = false;
+      } else if (this.initialDirection !== 'right') {
+        this.brokeBonusStreak = true;
+      }
       this.playerActualDirection = 'right';
-      this.moving = true; // Start moving or change direction
-      if (this.playerPaused) this.playerPaused = false; // Auto-unpause on first move
+      this.moving = true;
     }
 
     if (this.playerPaused) return; // Do not move if paused
@@ -361,6 +371,30 @@ class MainScene extends Phaser.Scene {
     this.moving = false;
     this.playerActualDirection = null;
     this.input.keyboard.resetKeys();
+    // --- Floor bonus mechanic ---
+    if (this.brokeBonusStreak === false && this.initialDirection !== null) {
+      this.score += this.swipeBonus;
+      this.updateScoreText();
+      // Flash score text and show bonus text near player
+      this.tweens.add({
+        targets: this.scoreText,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 120,
+        yoyo: true,
+        ease: 'Power1',
+      });
+      const bonusText = this.add.text(this.player.x, this.player.y - 40, '+100 Bonus!', { font: '22px Arial', fill: '#00b300', fontStyle: 'bold' })
+        .setOrigin(0.5);
+      this.tweens.add({
+        targets: bonusText,
+        y: bonusText.y - 30,
+        alpha: 0,
+        duration: 700,
+        ease: 'Power1',
+        onComplete: () => bonusText.destroy()
+      });
+    }
     const nextFloor = this.floor + 1;
     if (nextFloor >= this.floorsPerLevel) {
       this.score += this.floorPoints;
@@ -404,6 +438,9 @@ class MainScene extends Phaser.Scene {
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
       this.direction = newDir;
     }
+    // Reset bonus mechanic for next floor
+    this.initialDirection = null;
+    this.brokeBonusStreak = false;
   }
 
   animatePlayerToFloor(floor, direction) {
@@ -421,6 +458,9 @@ class MainScene extends Phaser.Scene {
         this.lastPlayerX = this.player.x;
         this.distanceTraveled = 0;
         this.activateInvulnerability();
+        // Reset bonus mechanic for new floor
+        this.initialDirection = null;
+        this.brokeBonusStreak = false;
       }
     });
   }
