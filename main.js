@@ -64,6 +64,7 @@ class MainScene extends Phaser.Scene {
     this.score = 0;
     this.floorPoints = 50;
     this.levelBonus = 100;
+    this.swipeBonus = 100; // Skill-based floor bonus for single-direction traversal
 
     // Distance-based score accumulation
     this.distanceTraveled = 0;
@@ -148,6 +149,16 @@ class MainScene extends Phaser.Scene {
         this.highScoreText.setText('High Score: 0');
       }
     });
+
+    // Developer-only: collision toggle
+    this.ignoreCollisions = false;
+    this.toggleCollisionKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.toggleCollisionKey.on('down', () => {
+      this.ignoreCollisions = !this.ignoreCollisions;
+      this.updateCollisionIndicator();
+    });
+    this.createCollisionIndicator();
+    this.updateCollisionIndicator();
   }
 
   getFloorY(floorIdx) {
@@ -315,7 +326,7 @@ class MainScene extends Phaser.Scene {
   }
 
   checkCollision() {
-    if (!this.moving || this.invulnerable) return false; // Only check collisions if player is actively moving AND not invulnerable
+    if (this.ignoreCollisions || this.invulnerable || !this.moving) return false; // Only check collisions if player is actively moving AND not invulnerable
 
     const playerBounds = this.player.getBounds();
     const playerFloorY = this.player.y;
@@ -536,6 +547,28 @@ class MainScene extends Phaser.Scene {
     // this.cameras.main.resetFX(); // Not strictly necessary as flash auto-resets
 
     this.activateInvulnerability(); // Activate for the start of the game
+    this.createCollisionIndicator();
+    this.updateCollisionIndicator();
+  }
+
+  createCollisionIndicator() {
+    // Create the collision indicator text just below the HUD bar
+    if (!this.collisionOffText) {
+      this.collisionOffText = this.add.text(12, this.HUD_HEIGHT + 8, 'Collision: OFF', {
+        font: '16px Arial', fill: '#c00', fontStyle: 'bold'
+      })
+        .setOrigin(0, 0)
+        .setDepth(100)
+        .setScrollFactor(0);
+    }
+  }
+
+  updateCollisionIndicator() {
+    if (this.collisionOffText) {
+      this.collisionOffText.setVisible(!!this.ignoreCollisions);
+      // Always keep it just below the HUD bar
+      this.collisionOffText.y = this.HUD_HEIGHT + 8;
+    }
   }
 }
 
