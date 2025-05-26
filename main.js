@@ -189,8 +189,10 @@ class MainScene extends Phaser.Scene {
     this.player.y = this.getFloorY(this.floor);
     if (this.direction === 'right') {
       this.player.x = this.player.displayWidth / 2; // Use displayWidth for sprite
+      this.player.setFlipX(false); // Face right
     } else {
       this.player.x = this.game.config.width - this.player.displayWidth / 2; // Use displayWidth for sprite
+      this.player.setFlipX(true); // Face left
     }
     this.lastPlayerX = this.player.x;
     this.distanceTraveled = 0;
@@ -233,6 +235,10 @@ class MainScene extends Phaser.Scene {
       sprite.setDisplaySize(elevatorWidth, elevatorHeight);
       sprite.setOrigin(0.5, 0.5); // Center origin
       sprite.setTint(elevatorColor); // Tint the hook
+      // Flip hooks to face the player's starting side based on the current travel direction
+      // If player needs to go right, they start left, hooks face left (FlipX = true)
+      // If player needs to go left, they start right, hooks face right (FlipX = false)
+      sprite.setFlipX(this.direction === 'right');
 
       this.elevators.push({
         sprite, // Changed from rect
@@ -316,6 +322,7 @@ class MainScene extends Phaser.Scene {
         this.brokeBonusStreak = true;
       }
       this.playerActualDirection = 'left';
+      this.player.setFlipX(true); // Face left
       this.moving = true;
     } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
       if (!this.moving) {
@@ -325,6 +332,7 @@ class MainScene extends Phaser.Scene {
         this.brokeBonusStreak = true;
       }
       this.playerActualDirection = 'right';
+      this.player.setFlipX(false); // Face right
       this.moving = true;
     }
 
@@ -477,8 +485,8 @@ class MainScene extends Phaser.Scene {
       this.floor = 0;
       this.levelText.setText('Level: ' + this.level);
       this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
-      this.direction = 'right';
-      this.createElevators();
+      this.direction = 'right'; // Player will start on the left, needing to go right
+      this.createElevators(); // Elevators will be created facing left (towards player)
       this.transitioning = true; // Block input during transition
       this.tweens.add({
         targets: this.player,
@@ -487,6 +495,7 @@ class MainScene extends Phaser.Scene {
         ease: 'Power2',
         onComplete: () => {
           this.player.x = this.player.displayWidth / 2; // Use displayWidth
+          this.player.setFlipX(false); // Player faces right (new direction)
           this.player.y = this.game.config.height + this.player.displayHeight / 2; // Use displayHeight
           this.tweens.add({
             targets: this.player,
@@ -518,6 +527,13 @@ class MainScene extends Phaser.Scene {
       this.floor = nextFloor;
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
       this.direction = newDir;
+
+      // Flip existing elevators to face the player's new starting side
+      for (const elevator of this.elevators) {
+        // If player needs to go right (newDir === 'right'), hooks face left (FlipX = true)
+        // If player needs to go left (newDir === 'left'), hooks face right (FlipX = false)
+        elevator.sprite.setFlipX(this.direction === 'right');
+      }
     }
     // Reset bonus mechanic for next floor
     this.initialDirection = null;
@@ -527,6 +543,8 @@ class MainScene extends Phaser.Scene {
   animatePlayerToFloor(floor, direction, onCompleteCb) {
     const newY = this.getFloorY(floor);
     const newX = direction === 'right' ? this.player.displayWidth / 2 : this.game.config.width - this.player.displayWidth / 2; // Use displayWidth
+    this.player.setFlipX(direction === 'left'); // Flip player: true if going left, false if going right
+
     this.tweens.add({
       targets: this.player,
       y: newY,
