@@ -160,6 +160,9 @@ class MainScene extends Phaser.Scene {
     this.createCollisionIndicator();
     this.updateCollisionIndicator();
 
+    // --- Elevator Tethers ---
+    this.tetherGraphics = this.add.graphics();
+
     this.transitioning = false; // Block input during level/floor transitions
   }
 
@@ -323,8 +326,17 @@ class MainScene extends Phaser.Scene {
       // clamping handles it, and no floor cross occurs.
     }
 
-    // Elevators movement (independent, always move) <-- This block was moved up
-    // for (const elevator of this.elevators) { ... }
+    // Elevator tethers: draw lines from top of screen to each elevator
+    this.tetherGraphics.clear();
+    this.tetherGraphics.lineStyle(2, 0x999999, 1);
+    for (const elevator of this.elevators) {
+      // Get the X center of the elevator
+      const x = elevator.rect.x;
+      // Get the top Y of the elevator
+      const y = elevator.rect.y - elevator.rect.height / 2;
+      // Draw a vertical line from (x, 0) to (x, y)
+      this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, 0, x, y));
+    }
   }
 
   checkCollision() {
