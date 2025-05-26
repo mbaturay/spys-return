@@ -184,6 +184,10 @@ class MainScene extends Phaser.Scene {
   }
 
   createElevators() {
+    // Clear tethers before destroying and recreating elevators to avoid visual artifacts
+    if (this.tetherGraphics) {
+      this.tetherGraphics.clear();
+    }
     if (this.elevators) {
       for (const elevator of this.elevators) {
         elevator.rect.destroy();
@@ -244,7 +248,22 @@ class MainScene extends Phaser.Scene {
       elevator.rect.y = elevator.centerY + elevator.amplitude * Math.sin((time / 1000) * (elevator.speed / 100) + elevator.phase);
     }
 
-    if (this.transitioning) return; // Block input and movement during transitions
+    // Elevator tethers: draw lines from bottom of HUD to each elevator
+    // Moved this block before the 'this.transitioning' check to ensure tethers are always updated
+    this.tetherGraphics.clear();
+    for (const elevator of this.elevators) {
+      // Get the X center of the elevator
+      const x = elevator.rect.x;
+      // Get the top Y of the elevator
+      const y = elevator.rect.y - elevator.rect.height / 2;
+      // Use the elevator\'s color for the tether
+      const color = elevator.rect.fillColor || 0x999999;
+      this.tetherGraphics.lineStyle(2, color, 1);
+      // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, y) to ensure perfect connection
+      this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, y));
+    }
+
+    if (this.transitioning) return; // Block player input and movement logic during transitions
 
     // Debug mode: Draw hitboxes
     this.debugGraphics.clear(); // Clear previous frame's debug drawings
@@ -326,17 +345,19 @@ class MainScene extends Phaser.Scene {
       // clamping handles it, and no floor cross occurs.
     }
 
-    // Elevator tethers: draw lines from top of screen to each elevator
-    this.tetherGraphics.clear();
-    this.tetherGraphics.lineStyle(2, 0x999999, 1);
-    for (const elevator of this.elevators) {
-      // Get the X center of the elevator
-      const x = elevator.rect.x;
-      // Get the top Y of the elevator
-      const y = elevator.rect.y - elevator.rect.height / 2;
-      // Draw a vertical line from (x, 0) to (x, y)
-      this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, 0, x, y));
-    }
+    // Elevator tethers: draw lines from bottom of HUD to each elevator
+    // this.tetherGraphics.clear(); // Moved up
+    // for (const elevator of this.elevators) { // Moved up
+    //   // Get the X center of the elevator // Moved up
+    //   const x = elevator.rect.x; // Moved up
+    //   // Get the top Y of the elevator // Moved up
+    //   const y = elevator.rect.y - elevator.rect.height / 2; // Moved up
+    //   // Use the elevator\'s color for the tether // Moved up
+    //   const color = elevator.rect.fillColor || 0x999999; // Moved up
+    //   this.tetherGraphics.lineStyle(2, color, 1); // Moved up
+    //   // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, y) to ensure perfect connection // Moved up
+    //   this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, y)); // Moved up
+    // } // Moved up
   }
 
   checkCollision() {
