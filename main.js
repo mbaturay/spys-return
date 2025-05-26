@@ -235,10 +235,10 @@ class MainScene extends Phaser.Scene {
       sprite.setDisplaySize(elevatorWidth, elevatorHeight);
       sprite.setOrigin(0.5, 0.5); // Center origin
       sprite.setTint(elevatorColor); // Tint the hook
-      // Flip hooks to face the player's starting side based on the current travel direction
-      // If player needs to go right, they start left, hooks face left (FlipX = true)
-      // If player needs to go left, they start right, hooks face right (FlipX = false)
-      sprite.setFlipX(this.direction === 'right');
+      // Flip hooks to face the player's target travel direction
+      // If player needs to go right, hooks face right (FlipX = false)
+      // If player needs to go left, hooks face left (FlipX = true)
+      sprite.setFlipX(this.direction === 'left');
 
       this.elevators.push({
         sprite, // Changed from rect
@@ -528,11 +528,11 @@ class MainScene extends Phaser.Scene {
       this.floorText.setText('Floor: ' + (this.floor + 1) + ' / ' + this.floorsPerLevel);
       this.direction = newDir;
 
-      // Flip existing elevators to face the player's new starting side
+      // Flip existing elevators to face the player's new target travel direction
       for (const elevator of this.elevators) {
-        // If player needs to go right (newDir === 'right'), hooks face left (FlipX = true)
-        // If player needs to go left (newDir === 'left'), hooks face right (FlipX = false)
-        elevator.sprite.setFlipX(this.direction === 'right');
+        // If player needs to go right (this.direction === 'right'), hooks face right (FlipX = false)
+        // If player needs to go left (this.direction === 'left'), hooks face left (FlipX = true)
+        elevator.sprite.setFlipX(this.direction === 'left');
       }
     }
     // Reset bonus mechanic for next floor
