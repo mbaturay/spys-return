@@ -7,6 +7,7 @@ class MainScene extends Phaser.Scene {
     // Load assets (placeholder for now)
     this.load.image('hook', 'assets/hook.svg'); // Added hook asset
     this.load.image('fish', 'assets/fish.svg'); // Added fish asset
+    this.load.image('shield', 'assets/shield.svg'); // Shield power-up
   }
 
   create() {
@@ -177,6 +178,19 @@ class MainScene extends Phaser.Scene {
     this.tetherGraphics = this.add.graphics();
 
     this.transitioning = false; // Block input during level/floor transitions
+
+    // --- Power-ups ---
+    this.powerUps = this.add.group(); // Group for shield power-ups
+    this.hasShield = false; // Track shield state
+    this.shieldOutline = null; // For visual effect
+
+    // Timed shield spawn event
+    this.time.addEvent({
+      delay: Phaser.Math.Between(10000, 15000),
+      callback: this.spawnShieldPowerUp,
+      callbackScope: this,
+      loop: true
+    });
   }
 
   getFloorY(floorIdx) {
@@ -267,6 +281,43 @@ class MainScene extends Phaser.Scene {
       this.player.setTint(this.originalPlayerColor); // New for sprite (clear tint)
       this.invulnerabilityTimer = null; // Clear the timer reference
     }, [], this);
+  }
+
+  spawnShieldPowerUp() {
+    // Only spawn if not already present
+    if (this.powerUps.getLength() > 0) return;
+    // Pick a random X between elevator hooks
+    const margin = 60;
+    const minX = margin;
+    const maxX = this.game.config.width - margin;
+    let x = Phaser.Math.Between(minX, maxX);
+    // Avoid spawning directly under an elevator
+    for (let tries = 0; tries < 5; tries++) {
+      let tooClose = false;
+      for (const elevator of this.elevators) {
+        if (Math.abs(x - elevator.sprite.x) < 50) tooClose = true;
+      }
+      if (!tooClose) break;
+      x = Phaser.Math.Between(minX, maxX);
+    }
+    const y = this.getFloorY(this.floor);
+    // Use a text object 'S' instead of a sprite
+    const shield = this.add.text(x, y, 'S', { font: '32px Arial', fill: '#00ffff', fontStyle: 'bold', stroke: '#fff', strokeThickness: 3 })
+      .setOrigin(0.5)
+      .setAlpha(0);
+    this.powerUps.add(shield);
+    // Fade-in and bounce animation
+    this.tweens.add({
+      targets: shield,
+      alpha: 1,
+      scale: { from: 0.7, to: 1 },
+      duration: 400,
+      ease: 'Back.Out',
+    });
+    // Despawn after 6 seconds if not collected
+    this.time.delayedCall(6000, () => {
+      if (shield.active) shield.destroy();
+    });
   }
 
   update(time, delta) {
@@ -383,38 +434,58 @@ class MainScene extends Phaser.Scene {
       // clamping handles it, and no floor cross occurs.
     }
 
-    // Elevator tethers: draw lines from bottom of HUD to each elevator
-    // this.tetherGraphics.clear(); // Moved up
-    // for (const elevator of this.elevators) { // Moved up
-    //   // Get the X center of the elevator // Moved up
-    //   const x = elevator.rect.x; // Moved up
-    //   // Get the top Y of the elevator // Moved up
-    //   const y = elevator.rect.y - elevator.rect.height / 2; // Moved up
-    //   // Use the elevator\'s color for the tether // Moved up
-    //   const color = elevator.rect.fillColor || 0x999999; // Moved up
-    //   this.tetherGraphics.lineStyle(2, color, 1); // Moved up
-    //   // Draw a vertical line from (x, this.HUD_HEIGHT) to (x, y) to ensure perfect connection // Moved up
-    //   this.tetherGraphics.strokeLineShape(new Phaser.Geom.Line(x, this.HUD_HEIGHT, x, y)); // Moved up
-    // } // Moved up
+    // Power-up collision check
+    if (this.powerUps) {
+      this.powerUps.children.each((shield) => {
+        if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), shield.getBounds())) {
+          shield.destroy();
+          this.hasShield = true;
+          // Add glowing outline
+          if (!this.shieldOutline) {
+            this.shieldOutline = this.add.ellipse(this.player.x, this.player.y, 70, 50, 0x00ffff, 0.3).setDepth(10);
+          }
+        }
+      });
+    }
+    // Update shield outline position
+    if (this.shieldOutline) {
+      this.shieldOutline.x = this.player.x;
+      this.shieldOutline.y = this.player.y;
+      if (!this.hasShield) {
+        this.shieldOutline.destroy();
+        this.shieldOutline = null;
+      }
+    }
   }
 
   checkCollision() {
-    if (this.ignoreCollisions || this.invulnerable || !this.moving) return false; // Only check collisions if player is actively moving AND not invulnerable
-
+    if (this.ignoreCollisions || this.invulnerable || !this.moving) return false;
     const playerBounds = this.player.getBounds();
     const playerFloorY = this.player.y;
-    const tolerance = 20; // Tolerance for vertical alignment
-
+    const tolerance = 20;
     for (const elevator of this.elevators) {
-      const elevatorCenterY = elevator.sprite.y; // Changed from elevator.rect.y
-
-      // Check if the elevator is vertically aligned with the player's current floor
+      const elevatorCenterY = elevator.sprite.y;
       if (Math.abs(elevatorCenterY - playerFloorY) <= tolerance) {
-        // const elevatorBounds = elevator.rect.getBounds(); // Old
-        const elevatorBounds = elevator.sprite.getBounds(); // New
+        const elevatorBounds = elevator.sprite.getBounds();
         if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, elevatorBounds)) {
+          if (this.hasShield) {
+            this.hasShield = false;
+            if (this.shieldOutline) {
+              this.shieldOutline.destroy();
+              this.shieldOutline = null;
+            }
+            // Prevent further collision checks this frame
+            // Move player slightly away from the elevator to avoid instant re-collision
+            if (this.player.x < elevator.sprite.x) {
+              this.player.x -= 30;
+            } else {
+              this.player.x += 30;
+            }
+            this.cameras.main.flash(150, 0, 255, 255);
+            return false; // Shield used up, no game over
+          }
           this.triggerGameOver();
-          return true; // Collision detected
+          return true;
         }
       }
     }
