@@ -183,9 +183,8 @@ class MainScene extends Phaser.Scene {
     this.powerUps = this.add.group(); // Group for shield power-ups
     this.hasShield = false; // Track shield state
     this.shieldOutline = null; // For visual effect
-
-    // Timed shield spawn event
-    this.time.addEvent({
+    this.shieldAvailableThisLevel = true; // Only one shield per level
+    this.shieldSpawnTimer = this.time.addEvent({
       delay: Phaser.Math.Between(10000, 15000),
       callback: this.spawnShieldPowerUp,
       callbackScope: this,
@@ -284,8 +283,8 @@ class MainScene extends Phaser.Scene {
   }
 
   spawnShieldPowerUp() {
-    // Only spawn if not already present
-    if (this.powerUps.getLength() > 0) return;
+    // Only spawn if not already present and shield is available for this level
+    if (this.powerUps.getLength() > 0 || !this.shieldAvailableThisLevel) return;
     // Pick a random X between elevator hooks
     const margin = 60;
     const minX = margin;
@@ -316,7 +315,10 @@ class MainScene extends Phaser.Scene {
     });
     // Despawn after 6 seconds if not collected
     this.time.delayedCall(6000, () => {
-      if (shield.active) shield.destroy();
+      if (shield.active) {
+        shield.destroy();
+        this.shieldAvailableThisLevel = false; // Mark as used even if despawned
+      }
     });
   }
 
@@ -440,6 +442,7 @@ class MainScene extends Phaser.Scene {
         if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), shield.getBounds())) {
           shield.destroy();
           this.hasShield = true;
+          this.shieldAvailableThisLevel = false; // Mark as used for this level
           // Add glowing outline
           if (!this.shieldOutline) {
             this.shieldOutline = this.add.ellipse(this.player.x, this.player.y, 70, 50, 0x00ffff, 0.3).setDepth(10);
@@ -521,6 +524,16 @@ class MainScene extends Phaser.Scene {
         this.gameOverText.setVisible(true);
       }
     }, [], this);
+
+    // Stop all power-up timers
+    if (this.shieldSpawnTimer) {
+      this.shieldSpawnTimer.remove(false);
+      this.shieldSpawnTimer = null;
+    }
+    // Remove any active power-ups
+    if (this.powerUps) {
+      this.powerUps.clear(true, true);
+    }
   }
 
   handleFloorCross() {
@@ -562,6 +575,8 @@ class MainScene extends Phaser.Scene {
       this.floorText.setText('Floor: 1 / ' + this.floorsPerLevel);
       this.direction = 'right'; // Player will start on the left, needing to go right
       this.createElevators(); // Elevators will be created facing left (towards player)
+      // Only allow shield to respawn if player does NOT have a shield
+      this.shieldAvailableThisLevel = !this.hasShield;
       this.transitioning = true; // Block input during transition
       this.tweens.add({
         targets: this.player,
@@ -714,6 +729,29 @@ class MainScene extends Phaser.Scene {
     this.createCollisionIndicator();
     this.updateCollisionIndicator();
     this.playerPaused = false; // Allow movement after reset
+
+    // Remove any shield outline
+    if (this.shieldOutline) {
+      this.shieldOutline.destroy();
+      this.shieldOutline = null;
+    }
+    this.hasShield = false;
+    this.shieldAvailableThisLevel = true;
+    // Remove any active power-ups
+    if (this.powerUps) {
+      this.powerUps.clear(true, true);
+    }
+    // Restart shield spawn timer
+    if (this.shieldSpawnTimer) {
+      this.shieldSpawnTimer.remove(false);
+      this.shieldSpawnTimer = null;
+    }
+    this.shieldSpawnTimer = this.time.addEvent({
+      delay: Phaser.Math.Between(10000, 15000),
+      callback: this.spawnShieldPowerUp,
+      callbackScope: this,
+      loop: true
+    });
   }
 
   createCollisionIndicator() {
